@@ -6,11 +6,12 @@ import BaseModal from '../components/ui/BaseModal.vue'
 import EmptyState from '../components/ui/EmptyState.vue'
 import { useFamilyStore } from '../stores/useFamilyStore'
 import type { MedicationPlan } from '../types'
-import { formatDate } from '../utils/date'
+import { duplicateTimes, formatDate } from '../utils/date'
 import { formatPercent } from '../utils/format'
 
 const store = useFamilyStore()
 const showForm = ref(false)
+const editing = ref<MedicationPlan | null>(null)
 
 const todayDoses = computed(() => store.todayDoses)
 const compliance = computed(() => store.compliance7)
@@ -22,9 +23,23 @@ function memberName(plan: MedicationPlan) {
 function medicineName(plan: MedicationPlan) {
   return store.getMedicine(plan.medicineId)?.name ?? '—'
 }
+function planDuplicateTimes(plan: MedicationPlan) {
+  return duplicateTimes(plan.times)
+}
+
+function openAdd() {
+  editing.value = null
+  showForm.value = true
+}
+
+function openEdit(plan: MedicationPlan) {
+  editing.value = plan
+  showForm.value = true
+}
 
 function onSave(data: Omit<MedicationPlan, 'id'>) {
-  store.addPlan(data)
+  if (editing.value) store.updatePlan(editing.value.id, data)
+  else store.addPlan(data)
   showForm.value = false
 }
 
@@ -39,7 +54,7 @@ function onDelete(plan: MedicationPlan) {
   <div class="page">
     <div class="page-head">
       <h1 class="page-title">用药提醒</h1>
-      <button type="button" class="btn btn-primary" @click="showForm = true">＋ 新建用药计划</button>
+      <button type="button" class="btn btn-primary" @click="openAdd">＋ 新建用药计划</button>
     </div>
 
     <!-- Compliance -->
@@ -79,22 +94,38 @@ function onDelete(plan: MedicationPlan) {
       <template v-if="plans.length">
         <div v-for="p in plans" :key="p.id" class="plan-item">
           <div class="plan-info">
-            <div class="plan-title">{{ memberName(p) }} · {{ medicineName(p) }}</div>
+            <div class="plan-title">
+              {{ memberName(p) }} · {{ medicineName(p) }}
+              <span
+                v-if="planDuplicateTimes(p).length"
+                class="plan-flag"
+                :title="`时间点 ${planDuplicateTimes(p).join('、')} 重复，请编辑修正`"
+              >
+                ⚠ 时间重复
+              </span>
+            </div>
             <div class="plan-meta">
               <span>剂量 {{ p.dosage || '—' }}</span>
               <span>时间 {{ p.times.join(' / ') }}</span>
               <span>{{ formatDate(p.startDate) }} ~ {{ formatDate(p.endDate) }}</span>
             </div>
           </div>
-          <button type="button" class="btn btn-sm btn-danger-ghost" @click="onDelete(p)">删除</button>
+          <div class="plan-actions">
+            <button type="button" class="btn btn-sm btn-ghost" @click="openEdit(p)">编辑</button>
+            <button type="button" class="btn btn-sm btn-danger-ghost" @click="onDelete(p)">删除</button>
+          </div>
         </div>
       </template>
       <EmptyState v-else icon="📅" text="暂无用药计划" />
     </section>
   </div>
 
-  <BaseModal v-if="showForm" title="新建用药计划" @close="showForm = false">
-    <PlanForm @save="onSave" @close="showForm = false" />
+  <BaseModal
+    v-if="showForm"
+    :title="editing ? '编辑用药计划' : '新建用药计划'"
+    @close="showForm = false"
+  >
+    <PlanForm :plan="editing" @save="onSave" @close="showForm = false" />
   </BaseModal>
 </template>
 
@@ -155,6 +186,22 @@ function onDelete(plan: MedicationPlan) {
 .plan-title {
   font-weight: 600;
   color: var(--text-primary);
+}
+.plan-flag {
+  display: inline-block;
+  margin-left: 8px;
+  padding: 1px 8px;
+  border-radius: 10px;
+  background: rgba(243, 156, 18, 0.12);
+  color: var(--warning-color);
+  font-size: 12px;
+  font-weight: 600;
+  vertical-align: middle;
+}
+.plan-actions {
+  display: flex;
+  gap: 8px;
+  flex-shrink: 0;
 }
 .plan-meta {
   display: flex;

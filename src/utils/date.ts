@@ -46,6 +46,25 @@ export function timeToMinutes(time: string): number {
   return h * 60 + (m || 0)
 }
 
+const TIME_RE = /^([01]\d|2[0-3]):[0-5]\d$/
+
+/** Strict 24h "HH:MM" check. */
+export function isValidTime(time: string): boolean {
+  return TIME_RE.test(time)
+}
+
+/** Values appearing more than once, in first-seen order. */
+export function duplicateTimes(times: string[]): string[] {
+  const seen = new Set<string>()
+  const dupes = new Set<string>()
+  for (const t of times) {
+    if (!t) continue
+    if (seen.has(t)) dupes.add(t)
+    else seen.add(t)
+  }
+  return [...dupes]
+}
+
 export function lastNDates(n: number): string[] {
   const out: string[] = []
   const now = new Date()

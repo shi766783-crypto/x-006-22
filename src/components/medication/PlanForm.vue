@@ -1,7 +1,8 @@
 <script setup lang="ts">
-import { reactive } from 'vue'
+import { computed, reactive } from 'vue'
 import { useFamilyStore } from '../../stores/useFamilyStore'
 import type { MedicationPlan } from '../../types'
+import { isValidTime } from '../../utils/date'
 
 const props = defineProps<{ plan?: MedicationPlan | null }>()
 const emit = defineEmits<{
@@ -20,17 +21,35 @@ const form = reactive({
   endDate: props.plan?.endDate ?? '',
 })
 
+// Per-row validation, computed live so existing duplicates in an
+// edited plan are flagged as soon as the form opens.
+const timeErrors = computed(() => {
+  const counts = new Map<string, number>()
+  for (const t of form.times) {
+    if (t) counts.set(t, (counts.get(t) ?? 0) + 1)
+  }
+  return form.times.map((t) => {
+    if (!t) return '请选择服药时间'
+    if (!isValidTime(t)) return `「${t}」不是有效时间`
+    if ((counts.get(t) ?? 0) > 1) return `时间点 ${t} 重复`
+    return ''
+  })
+})
+
+const hasTimeError = computed(() => timeErrors.value.some(Boolean))
+
 function addTime() {
   form.times.push('12:00')
 }
 
 function removeTime(index: number) {
+  if (form.times.length <= 1) return
   form.times.splice(index, 1)
 }
 
 function submit() {
   if (!form.memberId || !form.medicineId) return
-  if (!form.times.length) return
+  if (!form.times.length || hasTimeError.value) return
   emit('save', {
     memberId: form.memberId,
     medicineId: form.medicineId,
@@ -69,14 +88,23 @@ function submit() {
       <input v-model="form.endDate" type="date" class="input" />
     </div>
     <div class="form-group span-2">
-      <label class="form-label">每日服药时间</label>
+      <label class="form-label">每日服药时间 *</label>
       <div class="time-list">
         <div v-for="(time, i) in form.times" :key="time + i" class="time-row">
-          <input v-model="form.times[i]" type="time" class="input" />
+          <div class="time-field">
+            <input
+              v-model="form.times[i]"
+              type="time"
+              class="input"
+              :class="{ 'input-error': timeErrors[i] }"
+            />
+            <p v-if="timeErrors[i]" class="field-error">{{ timeErrors[i] }}</p>
+          </div>
           <button
             type="button"
             class="btn btn-sm btn-ghost"
             :disabled="form.times.length <= 1"
+            title="至少保留一个时间点"
             @click="removeTime(i)"
           >
             移除
@@ -107,6 +135,24 @@ function submit() {
 .time-row {
   display: flex;
   gap: 8px;
-  align-items: center;
+  align-items: flex-start;
+}
+.time-field {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.input-error {
+  border-color: var(--danger-color);
+}
+.input-error:focus {
+  border-color: var(--danger-color);
+  box-shadow: 0 0 0 3px rgba(231, 76, 60, 0.12);
+}
+.field-error {
+  margin: 0;
+  font-size: 12px;
+  color: var(--danger-color);
 }
 </style>

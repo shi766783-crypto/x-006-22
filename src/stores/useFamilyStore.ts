@@ -137,6 +137,12 @@ function createStore() {
     commit()
   }
 
+  function updatePlan(id: string, patch: Partial<MedicationPlan>) {
+    const plan = state.plans.find((p) => p.id === id)
+    if (plan) Object.assign(plan, patch)
+    commit()
+  }
+
   function deletePlan(id: string) {
     state.plans = state.plans.filter((p) => p.id !== id)
     commit()
@@ -274,6 +280,7 @@ function createStore() {
     cleanExpired,
     getMedicine,
     addPlan,
+    updatePlan,
     deletePlan,
     logDose,
     addRecord,
