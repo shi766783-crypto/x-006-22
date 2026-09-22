@@ -16,6 +16,7 @@ import { evaluateAchievements } from '../utils/achievements'
 import { daysUntil, formatDate, lastNDates, timeToMinutes, todayStr } from '../utils/date'
 import { computeHealthScore, type HealthScoreResult } from '../utils/healthScore'
 import { uid } from '../utils/id'
+import { normalizeTimes } from '../utils/planTime'
 
 interface FamilyState {
   members: FamilyMember[]
@@ -137,6 +138,12 @@ function createStore() {
     commit()
   }
 
+  function updatePlan(id: string, patch: Partial<Omit<MedicationPlan, 'id'>>) {
+    const plan = state.plans.find((p) => p.id === id)
+    if (plan) Object.assign(plan, patch)
+    commit()
+  }
+
   function deletePlan(id: string) {
     state.plans = state.plans.filter((p) => p.id !== id)
     commit()
@@ -197,7 +204,8 @@ function createStore() {
       const member = state.members.find((m) => m.id === plan.memberId)
       const medicine = state.medicines.find((m) => m.id === plan.medicineId)
       if (!member || !medicine) continue
-      for (const time of plan.times) {
+      // 旧数据可能存在重复/非法时间点，归一化后再生成提醒
+      for (const time of normalizeTimes(plan.times)) {
         const log = state.logs.find(
           (l) => l.planId === plan.id && l.date === today && l.time === time,
         )
@@ -274,6 +282,7 @@ function createStore() {
     cleanExpired,
     getMedicine,
     addPlan,
+    updatePlan,
     deletePlan,
     logDose,
     addRecord,
